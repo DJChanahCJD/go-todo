@@ -1,0 +1,208 @@
+{{define "content"}}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>任务列表</h2>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTodoModal">
+                添加任务
+            </button>
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>标题</th>
+                    <th>描述</th>
+                    <th>状态</th>
+                    <th>截止日期</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .todos}}
+                <tr>
+                    <td>{{.ID}}</td>
+                    <td>{{.Title}}</td>
+                    <td>{{.Description}}</td>
+                    <td>
+                        {{if .Completed}}
+                        <span class="badge bg-success">已完成</span>
+                        {{else}}
+                        <span class="badge bg-warning">进行中</span>
+                        {{end}}
+                    </td>
+                    <td>{{if .DueDate}}{{.DueDate.Format "2006-01-02"}}{{end}}</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="editTodo('{{.ID}}');">编辑</button>
+                        {{if not .Completed}}
+                        <button class="btn btn-sm btn-success" onclick="completeTodo('{{.ID}}');">完成</button>
+                        {{end}}
+                        <button class="btn btn-sm btn-danger" onclick="deleteTodo('{{.ID}}');">删除</button>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 添加任务模态框 -->
+<div class="modal fade" id="addTodoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加新任务</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addTodoForm">
+                    <div class="mb-3">
+                        <label class="form-label">标题</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">描述</label>
+                        <textarea class="form-control" name="description"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">截止日期</label>
+                        <input type="date" class="form-control" name="dueDate">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitTodo()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑任务模态框 -->
+<div class="modal fade" id="editTodoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑任务</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editTodoForm">
+                    <input type="hidden" name="id">
+                    <div class="mb-3">
+                        <label class="form-label">标题</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">描述</label>
+                        <textarea class="form-control" name="description"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">截止日期</label>
+                        <input type="date" class="form-control" name="dueDate">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="updateTodo()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 提交新任务
+function submitTodo() {
+    const form = document.getElementById('addTodoForm');
+    const formData = new FormData(form);
+    const todo = Object.fromEntries(formData);
+
+    fetch('/api/todos', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(todo)
+    })
+    .then(response => response.json())
+    .then(() => {
+        location.reload();
+    })
+    .catch(error => alert('Error: ' + error));
+}
+
+// 编辑任务
+// 编辑任务
+function editTodo(id) {
+    // 获取任务详情
+    fetch(`/api/todos/${id}`)
+        .then(response => response.json())
+        .then(todo => {
+            // 填充表单
+            const form = document.getElementById('editTodoForm');
+            form.id.value = todo.id;           // 修改：使用 todo.id
+            form.title.value = todo.title;     // 修改：使用 todo.title
+            form.description.value = todo.description;  // 修改：使用 todo.description
+            if (todo.due_date) {  // 正确：使用 todo.due_date
+                form.dueDate.value = todo.due_date.split('T')[0];
+            }
+            
+            // 显示编辑模态框
+            const modal = new bootstrap.Modal(document.getElementById('editTodoModal'));
+            modal.show();
+        })
+        .catch(error => alert('Error: ' + error));
+}
+
+// 更新任务
+function updateTodo() {
+    const form = document.getElementById('editTodoForm');
+    const formData = new FormData(form);
+    const todo = Object.fromEntries(formData);
+
+    // 构造符合后端期望的数据结构
+    const data = {
+        title: todo.title,
+        description: todo.description,
+        due_date: todo.dueDate ? todo.dueDate + "T00:00:00Z" : null  // 添加时间部分
+    };
+
+    const id = parseInt(todo.id);
+    fetch(`/api/todos/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(() => {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editTodoModal'));
+        modal.hide();
+        location.reload();
+    })
+    .catch(error => alert('Error: ' + error));
+}
+
+// 完成任务
+function completeTodo(id) {
+    fetch(`/api/todos/${id}/complete`, {
+        method: 'PUT'
+    })
+    .then(() => location.reload())
+    .catch(error => alert('Error: ' + error));
+}
+
+// 删除任务
+function deleteTodo(id) {
+    if (!confirm('确定要删除这个任务吗？')) return;
+
+    fetch(`/api/todos/${id}`, {
+        method: 'DELETE'
+    })
+    .then(() => location.reload())
+    .catch(error => alert('Error: ' + error));
+}
+</script>
+{{end}}
